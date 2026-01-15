@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Simulator Pro</title>
+    <style>
+        /* --- CSS VARIABLES --- */
+        :root {
+            --rarity-common: #95a5a6;
+            --rarity-rare: #3498db;
+            --rarity-epic: #9b59b6;
+            --rarity-legendary: #f1c40f;
+            --rarity-mythic: #00f2fe;
+
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            
+            --primary-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --upgrade-btn: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            
+            --text-main: #f8fafc;
+            --text-secondary: #94a3b8;
+            --sidebar-width: 240px;
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* --- THE CORE LAYOUT ENGINE --- */
+        .app-shell {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            flex-direction: row; /* Mobile Mode: Sidebar */
+            position: relative;
+        }
+
+        /* --- NAVIGATION --- */
+        .navigation {
+            background: rgba(15, 23, 42, 0.98);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            z-index: 1000;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Mobile specific hidden state */
+        @media (max-width: 850px) {
+            .navigation {
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                transform: translateX(-100%);
+                box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+            }
+            .navigation.open {
+                transform: translateX(0);
+            }
+            
+            .menu-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.6);
+                z-index: 999;
+                backdrop-filter: blur(4px);
+            }
+            .menu-overlay.active { display: block; }
+        }
+
+        /* Mobile Menu Toggle Button */
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--primary-gradient);
+            border: none;
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 850px) {
+            .menu-toggle { display: flex; }
+        }
+
+        .nav-logo {
+            padding: 25px 15px;
+            text-align: center;
+        }
+
+        @keyframes titleFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .game-title {
+            font-size: 1.3rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            background: linear-gradient(-45deg, #ff3d00, #ffea00, #00e5ff, #76ff03);
+            background-size: 300% 300%;
+            animation: titleFlow 5s ease infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.1));
+        }
+
+        /* --- MAIN ANIMATED HEADER --- */
+        .main-game-header {
+            font-family: 'Arial Black', 'Inter', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 20px;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #ff3d00, #ffea00, #00e5ff, #76ff03, #ff3d00);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shine 3s linear infinite;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
+            text-transform: uppercase;
+        }
+
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+
+        .nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 14px 15px;
+            border-radius: 12px;
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn.active {
+            background: var(--glass-bg);
+            color: white;
+            box-shadow: inset 0 0 0 1px var(--glass-border);
+        }
+
+        /* --- MAIN VIEWPORT --- */
+        .viewport {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* --- DESKTOP SCALE ADJUSTMENTS --- */
+        @media (min-width: 851px) {
+            .app-shell { flex-direction: column; } 
+            
+            .navigation {
+                width: 100%;
+                height: 110px;
+                flex-direction: row;
+                order: 2;
+                border-right: none;
+                border-top: 1px solid var(--glass-border);
+                justify-content: center;
+                padding: 0;
+                transform: none !important;
+            }
+
+            .nav-logo { display: none; }
+            .nav-items { 
+                flex-direction: row; 
+                width: 100%; 
+                max-width: 1200px;
+                justify-content: space-evenly;
+                align-items: center;
+                gap: 20px;
+            }
+            .nav-btn {
+                flex-direction: column;
+                gap: 8px;
+                padding: 15px;
+                text-align: center;
+                font-size: 1.1rem;
+                flex: 1;
+                justify-content: center;
+                border-radius: 15px;
+            }
+            .nav-btn .icon { font-size: 2.2rem; }
+            
+            .viewport { order: 1; }
+            .top-stats { padding: 30px 40px; gap: 30px; }
+            .stat-pill { padding: 12px 30px; font-size: 1.3rem; border-radius: 30px; }
+            
+            .clicker-zone { min-height: 65vh; }
+            .main-game-header { font-size: 4.5rem; margin-bottom: 40px; } /* Massive header on desktop */
+            .main-button { 
+                width: 380px; 
+                height: 380px; 
+                font-size: 4rem; 
+                border-width: 20px;
+                box-shadow: 0 0 80px rgba(59, 130, 246, 0.4);
+            }
+            
+            .view-content { padding: 50px; }
+            .view-section { max-width: 1200px; }
+            h2 { font-size: 2.5rem; margin-bottom: 40px !important; }
+            
+            .grid-layout {
+                grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+                gap: 25px;
+            }
+            .item-card { padding: 30px; border-radius: 25px; }
+            .item-card h3 { font-size: 1.5rem; }
+            .buy-btn { padding: 15px 30px; font-size: 1.1rem; border-radius: 15px; }
+            .rarity-pill { font-size: 0.85rem; padding: 4px 12px; }
+        }
+
+        /* --- UI COMPONENTS --- */
+        .clicker-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 55vh;
+        }
+
+        .top-stats {
+            padding: 15px 25px;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border-bottom: 1px solid var(--glass-border);
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            background: rgba(0,0,0,0.4);
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .view-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px;
+            scrollbar-width: thin;
+        }
+
+        .view-section {
+            display: none;
+            max-width: 900px;
+            margin: 0 auto;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .view-section.active { display: block; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .main-button {
+            width: min(280px, 65vw);
+            height: min(280px, 65vw);
+            border-radius: 50%;
+            border: 12px solid rgba(255,255,255,0.05);
+            background: radial-gradient(circle at 30% 30%, #3b82f6, #1d4ed8);
+            cursor: pointer;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.3);
+            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.8rem;
+            color: white;
+            font-weight: 900;
+        }
+
+        .main-button:active { transform: scale(0.94); }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .item-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .rarity-pill {
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            display: inline-block;
+        }
+
+        .buy-btn {
+            background: var(--primary-gradient);
+            border: none;
+            padding: 10px 16px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .buy-btn:disabled {
+            background: #334155;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- MODAL --- */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            display: none; justify-content: center; align-items: center; z-index: 2000;
+            backdrop-filter: blur(10px);
+        }
+        .modal-content {
+            background: #1e293b; width: 95%; max-width: 500px;
+            padding: 40px; border-radius: 35px; text-align: center;
+            border: 1px solid var(--glass-border);
+        }
+
+        /* --- THEMES --- */
+        .bg-common { background: rgba(149, 165, 166, 0.3); border: 1px solid var(--rarity-common); }
+        .bg-rare { background: rgba(52, 152, 219, 0.3); border: 1px solid var(--rarity-rare); }
+        .bg-epic { background: rgba(155, 89, 182, 0.3); border: 1px solid var(--rarity-epic); }
+        .bg-legendary { background: rgba(241, 196, 15, 0.3); border: 1px solid var(--rarity-legendary); }
+        .bg-mythic { background: rgba(0, 242, 254, 0.3); border: 1px solid var(--rarity-mythic); }
+
+    </style>
+</head>
+<body>
+
+    <!-- Mobile Menu Toggle Button -->
+    <button class="menu-toggle" id="menu-btn" onclick="toggleMenu()">
+        <span id="menu-icon">☰</span>
+    </button>
+
+    <!-- Overlay for Mobile Sidebar -->
+    <div class="menu-overlay" id="overlay" onclick="toggleMenu()"></div>
+
+    <div class="app-shell">
+        <!-- Navigation -->
+        <nav class="navigation" id="sidebar">
+            <div class="nav-logo">
+                <h1 class="game-title">Pet Sim</h1>
+            </div>
+            <div class="nav-items">
+                <button class="nav-btn active" onclick="setView('home', this)">
+                    <span class="icon">🏠</span> <span>Home</span>
+                </button>
+                <button class="nav-btn" onclick="setView('shop', this)">
+                    <span class="icon">🐶</span> <span>Adopt</span>
+                </button>
+                <button class="nav-btn" onclick="setView('upgrades', this)">
+                    <span class="icon">⚡</span> <span>Upgrades</span>
+                </button>
+                <button class="nav-btn" onclick="setView('bag', this)">
+                    <span class="icon">🎒</span> <span>Bag</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Viewport -->
+        <div class="viewport">
+            <header class="top-stats">
+                <div class="stat-pill">💰 <span id="coin-count">0</span></div>
+                <div class="stat-pill">🚀 <span id="cps-count">0</span>/s</div>
+            </header>
+
+            <main class="view-content">
+                <!-- HOME -->
+                <section id="view-home" class="view-section active">
+                    <div class="clicker-zone">
+                        <h1 class="main-game-header">Pet Simulator 2D</h1>
+                        <button class="main-button" id="clicker">TAP</button>
+                        <div style="margin-top: 40px;">
+                            <button id="auto-btn" class="stat-pill" style="cursor:pointer;" onclick="toggleAuto()">
+                                🤖 Auto Click: <span id="auto-status">OFF</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SHOP -->
+                <section id="view-shop" class="view-section">
+                    <h2>Shelter</h2>
+                    <div id="shop-grid" class="grid-layout"></div>
+                </section>
+
+                <!-- UPGRADES -->
+                <section id="view-upgrades" class="view-section">
+                    <h2>Upgrades</h2>
+                    <div id="upgrades-grid" class="grid-layout"></div>
+                </section>
+
+                <!-- BAG -->
+                <section id="view-bag" class="view-section">
+                    <h2>Collection</h2>
+                    <div id="bag-grid" class="grid-layout"></div>
+                    
+                    <div style="margin-top: 60px; display:flex; gap:20px;">
+                        <button class="buy-btn" style="background:var(--success-color); flex:1; padding:20px;" onclick="saveGame()">💾 Save Progress</button>
+                        <button class="buy-btn" style="background:var(--danger-color); flex:1; padding:20px;" onclick="resetGame()">🗑️ Wipe Data</button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- LEVEL MODAL -->
+    <div id="level-modal" class="modal">
+        <div class="modal-content">
+            <div id="m-icon" style="font-size: 5rem; margin-bottom: 10px;"></div>
+            <h2 id="m-name" style="font-size: 2rem;"></h2>
+            <div id="m-rarity" class="rarity-pill"></div>
+            
+            <div style="background: rgba(0,0,0,0.2); padding: 25px; border-radius: 20px; margin: 25px 0; text-align: left; font-size: 1.1rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>Level:</span> <strong id="m-level">1</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>Total Speed:</span> <strong id="m-speed">0</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>Multiplier:</span> <strong id="m-multi">x1</strong>
+                </div>
+            </div>
+
+            <button id="m-upgrade-btn" class="level-up-btn" style="width:100%; padding:25px; border-radius:20px; border:none; background:var(--upgrade-btn); color:white; font-weight:700; cursor:pointer; font-size: 1.4rem;" onclick="levelUpPet()">
+                LEVEL UP <br>
+                <span id="m-cost" style="font-size: 1rem; font-weight: 400;">Cost: 100</span>
+            </button>
+            <button style="margin-top: 25px; background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size: 1.1rem;" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const PET_DATA = [
+            { id: 'cat', name: 'Cat', icon: '🐱', rarity: 'common', cost: 15, cps: 0.5, lCost: 100 },
+            { id: 'dog', name: 'Dog', icon: '🐶', rarity: 'common', cost: 100, cps: 3, lCost: 500 },
+            { id: 'fox', name: 'Fox', icon: '🦊', rarity: 'rare', cost: 750, cps: 15, lCost: 2500 },
+            { id: 'panda', name: 'Panda', icon: '🐼', rarity: 'epic', cost: 4000, cps: 60, lCost: 10000 },
+            { id: 'lion', name: 'Lion', icon: '🦁', rarity: 'legendary', cost: 20000, cps: 250, lCost: 50000 },
+            { id: 'alien', name: 'Alien', icon: '👽', rarity: 'mythic', cost: 100000, cps: 1500, lCost: 250000 }
+        ];
+
+        const UPGRADE_DATA = [
+            { id: 'up1', name: 'Iron Tap', cost: 50, add: 1 },
+            { id: 'up2', name: 'Steel Tap', cost: 500, add: 5 },
+            { id: 'up3', name: 'Neon Tap', cost: 5000, add: 30 },
+            { id: 'up4', name: 'God Tap', cost: 50000, add: 250 }
+        ];
+
+        let state = {
+            coins: 0,
+            clickPower: 1,
+            cps: 0,
+            owned: {},
+            lvls: {},
+            upgrades: [],
+            auto: false
+        };
+
+        let currentPetId = null;
+        let menuOpen = false;
+
+        function start() {
+            loadGame();
+            
+            setInterval(() => {
+                if (state.cps > 0) state.coins += state.cps / 10;
+                updateStats();
+                checkAffordability(); 
+                if(currentPetId) updateModal();
+            }, 100);
+
+            setInterval(() => {
+                if(state.auto) state.coins += state.clickPower;
+            }, 250);
+
+            renderShop();
+            renderUpgrades();
+            renderBag();
+        }
+
+        function toggleMenu() {
+            menuOpen = !menuOpen;
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const menuIcon = document.getElementById('menu-icon');
+            
+            if (menuOpen) {
+                sidebar.classList.add('open');
+                overlay.classList.add('active');
+                menuIcon.innerText = '✕';
+            } else {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+                menuIcon.innerText = '☰';
+            }
+        }
+
+        function setView(viewId, btn) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${viewId}`).classList.add('active');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            if (window.innerWidth <= 850 && menuOpen) {
+                toggleMenu();
+            }
+        }
+
+        document.getElementById('clicker').onclick = () => {
+            state.coins += state.clickPower;
+            updateStats();
+        };
+
+        function toggleAuto() {
+            state.auto = !state.auto;
+            document.getElementById('auto-status').innerText = state.auto ? "ON" : "OFF";
+            document.getElementById('auto-btn').style.background = state.auto ? "var(--success-color)" : "rgba(0,0,0,0.4)";
+        }
+
+        function getCost(p) {
+            const count = state.owned[p.id] || 0;
+            return Math.floor(p.cost * Math.pow(1.18, count));
+        }
+
+        function getLvlCost(p) {
+            const lvl = state.lvls[p.id] || 1;
+            return Math.floor(p.lCost * Math.pow(2.8, lvl - 1));
+        }
+
+        function buyPet(id) {
+            const p = PET_DATA.find(x => x.id === id);
+            const cost = getCost(p);
+            if(state.coins >= cost) {
+                state.coins -= cost;
+                state.owned[id] = (state.owned[id] || 0) + 1;
+                if(!state.lvls[id]) state.lvls[id] = 1;
+                calculateCps();
+                renderShop();
+                renderBag();
+            }
+        }
+
+        function buyUpgrade(id) {
+            const u = UPGRADE_DATA.find(x => x.id === id);
+            if(state.coins >= u.cost && !state.upgrades.includes(id)) {
+                state.coins -= u.cost;
+                state.upgrades.push(id);
+                state.clickPower += u.add;
+                renderUpgrades();
+            }
+        }
+
+        function calculateCps() {
+            let total = 0;
+            PET_DATA.forEach(p => {
+                const count = state.owned[p.id] || 0;
+                const lvl = state.lvls[p.id] || 1;
+                total += (count * p.cps * lvl);
+            });
+            state.cps = total;
+        }
+
+        function updateStats() {
+            document.getElementById('coin-count').innerText = Math.floor(state.coins).toLocaleString();
+            document.getElementById('cps-count').innerText = state.cps.toLocaleString();
+        }
+
+        function checkAffordability() {
+            document.querySelectorAll('.buy-btn[data-id]').forEach(btn => {
+                const id = btn.dataset.id;
+                const type = btn.dataset.type;
+                if(type === 'pet') {
+                    const p = PET_DATA.find(x => x.id === id);
+                    btn.disabled = state.coins < getCost(p);
+                } else if(type === 'upg') {
+                    const u = UPGRADE_DATA.find(x => x.id === id);
+                    btn.disabled = state.coins < u.cost;
+                }
+            });
+        }
+
+        function renderShop() {
+            const grid = document.getElementById('shop-grid');
+            grid.innerHTML = PET_DATA.map(p => `
+                <div class="item-card">
+                    <div>
+                        <div class="rarity-pill bg-${p.rarity}">${p.rarity}</div>
+                        <h3>${p.icon} ${p.name}</h3>
+                        <p style="color:var(--text-secondary)">Owned: ${state.owned[p.id] || 0}</p>
+                    </div>
+                    <button class="buy-btn" data-type="pet" data-id="${p.id}" onclick="buyPet('${p.id}')">
+                        ${getCost(p).toLocaleString()} 💰
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderUpgrades() {
+            const grid = document.getElementById('upgrades-grid');
+            grid.innerHTML = UPGRADE_DATA.filter(u => !state.upgrades.includes(u.id)).map(u => `
+                <div class="item-card">
+                    <div>
+                        <h3>⚡ ${u.name}</h3>
+                        <p style="color:var(--text-secondary)">+${u.add} Click Power</p>
+                    </div>
+                    <button class="buy-btn" data-type="upg" data-id="${u.id}" onclick="buyUpgrade('${u.id}')">
+                        ${u.cost.toLocaleString()} 💰
+                    </button>
+                </div>
+            `).join('') || '<p style="text-align:center; width:100%; opacity:0.5;">Maxed out!</p>';
+        }
+
+        function renderBag() {
+            const grid = document.getElementById('bag-grid');
+            const owned = PET_DATA.filter(p => state.owned[p.id] > 0);
+            grid.innerHTML = owned.map(p => `
+                <div class="item-card" onclick="openModal('${p.id}')" style="cursor:pointer">
+                    <div style="display:flex; align-items:center; gap:25px;">
+                        <span style="font-size:3.5rem">${p.icon}</span>
+                        <div>
+                            <div class="rarity-pill bg-${p.rarity}">${p.rarity}</div>
+                            <h3>${p.name}</h3>
+                            <p>x${state.owned[p.id]}</p>
+                        </div>
+                    </div>
+                    <div style="color:var(--success-color); font-weight:bold;">LVL ${state.lvls[p.id]}</div>
+                </div>
+            `).join('') || '<p style="text-align:center; width:100%; opacity:0.5;">Adopt some pets!</p>';
+        }
+
+        function openModal(id) {
+            currentPetId = id;
+            updateModal();
+            document.getElementById('level-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('level-modal').style.display = 'none';
+            currentPetId = null;
+        }
+
+        function updateModal() {
+            if(!currentPetId) return;
+            const p = PET_DATA.find(x => x.id === currentPetId);
+            const lvl = state.lvls[p.id];
+            const cost = getLvlCost(p);
+
+            document.getElementById('m-icon').innerText = p.icon;
+            document.getElementById('m-name').innerText = p.name;
+            document.getElementById('m-level').innerText = lvl;
+            document.getElementById('m-rarity').innerText = p.rarity;
+            document.getElementById('m-rarity').className = `rarity-pill bg-${p.rarity}`;
+            document.getElementById('m-speed').innerText = (state.owned[p.id] * p.cps * lvl).toLocaleString();
+            document.getElementById('m-multi').innerText = `x${lvl}`;
+            document.getElementById('m-cost').innerText = `Cost: ${cost.toLocaleString()} 💰`;
+            
+            const btn = document.getElementById('m-upgrade-btn');
+            btn.disabled = state.coins < cost;
+            btn.style.opacity = state.coins < cost ? "0.5" : "1";
+        }
+
+        function levelUpPet() {
+            const p = PET_DATA.find(x => x.id === currentPetId);
+            const cost = getLvlCost(p);
+            if(state.coins >= cost) {
+                state.coins -= cost;
+                state.lvls[currentPetId]++;
+                calculateCps();
+                renderBag();
+                updateModal();
+            }
+        }
+
+        function saveGame() {
+            localStorage.setItem('pet_sim_v10_save', JSON.stringify(state));
+            alert("Progress Saved!");
+        }
+
+        function loadGame() {
+            const raw = localStorage.getItem('pet_sim_v10_save');
+            if(raw) {
+                state = {...state, ...JSON.parse(raw)};
+                calculateCps();
+            }
+        }
+
+        function resetGame() {
+            if(confirm("Wipe all progress?")) {
+                localStorage.removeItem('pet_sim_v10_save');
+                location.reload();
+            }
+        }
+
+        start();
+    </script>
+</body>
+</html>
+
